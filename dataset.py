@@ -3,6 +3,7 @@ from tqdm import tqdm
 import torch
 from PIL import Image
 
+
 class ConcatDatasets(torch.utils.data.Dataset):
     def __init__(self, image_folders, transform=None):
         self.folders = [Path(folder) for folder in image_folders]
@@ -16,7 +17,7 @@ class ConcatDatasets(torch.utils.data.Dataset):
                     if name.is_file():
                         self.data.append((str(name), i))
         self.indices = list(range(len(self.data)))
-        print(f'Successfully loaded datasets with total {len(self.data)} images.\nClasses: {self.classes}')
+        print(f'Successfully loaded {len(image_folders)} datasets with total {len(self.data)} images.\nClasses: {self.classes}')
 
     def __len__(self):
         return len(self.data)

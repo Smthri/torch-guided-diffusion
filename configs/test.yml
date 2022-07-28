@@ -1,5 +1,10 @@
+RUN:
+    batch_size: 16
+    epochs: 10
+    eval_every: 2
+    lr: 1e-3
 DIFFUSION:
-    diffusion_steps: 1000
+    diffusion_steps: 200
     noise_schedule: cosine
     predict_xstart: false
     rescale_learned_sigmas: false
@@ -9,7 +14,7 @@ DIFFUSION:
 MODEL:
     attention_resolutions: 16,8
     channel_mult: ''
-    class_cond: false
+    class_cond: true
     dropout: 0.0
     image_size: 128
     learn_sigma: false
@@ -23,4 +28,3 @@ MODEL:
     use_fp16: false
     use_new_attention_order: false
     use_scale_shift_norm: true
-    num_classes: 9
