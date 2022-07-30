@@ -1,4 +1,5 @@
 from .unet import UNetModel
+from .huggingface_unet import Unet
 
 
 def create_unet(
@@ -32,10 +33,10 @@ def create_unet(
         else:
             raise ValueError(f"unsupported image size: {image_size}")
     else:
-        channel_mult = tuple(int(ch_mult) for ch_mult in channel_mult.split(","))
+        channel_mult = tuple(int(ch_mult) for ch_mult in str(channel_mult).split(","))
 
     attention_ds = []
-    for res in attention_resolutions.split(","):
+    for res in str(attention_resolutions).split(","):
         attention_ds.append(image_size // int(res))
 
     return UNetModel(
