@@ -38,7 +38,8 @@ if __name__ == '__main__':
         batch_size=config['RUN']['batch_size'],
         sampler=train_weighted_sampler,
         num_workers=32,
-        persistent_workers=True
+        persistent_workers=True,
+        pin_memory=True,
     )
 
     # Create a backbone model
@@ -68,7 +69,7 @@ if __name__ == '__main__':
         max_epochs=config['RUN']['epochs'],
         gpus=-1,
         replace_sampler_ddp=False,
-        accelerator='gpu',
+        accelerator='auto',
         amp_level='O3',
         amp_backend='apex',
         strategy='dp'

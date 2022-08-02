@@ -21,8 +21,7 @@ class DiffusionWrapper(pl.LightningModule):
         self.epoch = 0
         self.min_loss = np.inf
         self.ckpt_folder = Path(ckpt_folder)
-        if self.local_rank == 0:
-            wandb.init(project='PyTorch-Diffusion', config=config, group="DDP")
+        wandb.init(project='PyTorch-Diffusion', config=config)
 
     def forward(self, x):
         sampled = self.diffusion.p_sample_loop(
@@ -101,7 +100,7 @@ class DiffusionWrapper(pl.LightningModule):
         imsave(f'test-{self.epoch}_guided.png', grid)
 
         wandb.log(losses)
-        wandb.log({'generated_images': grid}, step=self.epoch)
+        wandb.log({'generated_images': wandb.Image(grid, caption='guided')}, step=self.epoch)
 
         if self.min_loss > loss:
             print(f'Loss decreased from {self.min_loss:.3f} to {loss:.3f}')
