@@ -78,6 +78,7 @@ if __name__ == '__main__':
         diffusion=gaussian_diffusion,
         image_size=IMAGE_SIZE,
         config=config,
+        ckpt_folder=config['RUN']['ckpt_dir']
     )
     trainer.fit(process, train_dataloaders=train_loader)
 

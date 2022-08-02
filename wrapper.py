@@ -8,6 +8,7 @@ from pathlib import Path
 import torchvision.models as tvmodels
 import torch.nn.functional as F
 from models import ResNet50
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 class DiffusionWrapper(pl.LightningModule):
@@ -53,7 +54,12 @@ class DiffusionWrapper(pl.LightningModule):
         return loss
 
     def training_epoch_end(self, outputs):
-        loss = np.mean([l['loss'].cpu().item() for l in outputs])
+        losses = {}
+        for k in outputs[0].keys():
+            losses[k] = np.mean([l[k].cpu().item() for l in outputs])
+        self.log('loss', losses['loss'])
+        self.log('mse', losses['mse'])
+        loss = losses['loss']
 
         AdvDis = ResNet50()
         AdvDis.to(self.device)
@@ -94,8 +100,8 @@ class DiffusionWrapper(pl.LightningModule):
         grid = (np.transpose(make_grid(sampled).cpu().numpy(), (1, 2, 0))).astype(np.uint8)
         imsave(f'test-{self.epoch}_guided.png', grid)
 
-        wandb.log({'loss': loss})
-        wandb.log({'generated_images': wandb.Image(grid)}, step=self.epoch)
+        wandb.log(losses)
+        wandb.log({'generated_images': grid}, step=self.epoch)
 
         if self.min_loss > loss:
             print(f'Loss decreased from {self.min_loss:.3f} to {loss:.3f}')
@@ -109,4 +115,12 @@ class DiffusionWrapper(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=float(self.config['RUN']['lr']))
-        return optimizer
+        scheduler = ReduceLROnPlateau(
+            optimizer=optimizer,
+            mode='min',
+            factor=0.5
+        )
+        return [optimizer], {
+            "scheduler": scheduler,
+            "monitor": "loss"
+        }
