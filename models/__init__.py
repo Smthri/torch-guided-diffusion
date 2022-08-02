@@ -1,5 +1,6 @@
 from .unet import UNetModel
 from .huggingface_unet import Unet
+from .classifier import ResNet50
 
 
 def create_unet(

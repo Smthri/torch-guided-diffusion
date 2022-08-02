@@ -4,7 +4,7 @@ RUN:
     eval_every: 2
     lr: 1e-4
 DIFFUSION:
-    diffusion_steps: 2000
+    diffusion_steps: 100
     noise_schedule: cosine
     predict_xstart: false
     rescale_learned_sigmas: false
@@ -12,21 +12,21 @@ DIFFUSION:
     timestep_respacing: ''
     loss: mse
     model_mean_type: x_prev
-    model_var_type: learned
+    model_var_type: fixed_small
 MODEL:
     attention_resolutions: 16,8
     channel_mult: ''
     class_cond: true
     dropout: 0.0
     image_size: 64
-    learn_sigma: true
+    learn_sigma: false
     num_channels: 128
     num_head_channels: -1
     num_heads: 2
     num_heads_upsample: -1
-    num_res_blocks: 1
-    resblock_updown: true
+    num_res_blocks: 2
+    resblock_updown: false
     use_checkpoint: false
     use_fp16: false
-    use_new_attention_order: false
+    use_new_attention_order: true
     use_scale_shift_norm: true

@@ -5,6 +5,9 @@ import numpy as np
 from skimage.io import imsave
 from torchvision.utils import make_grid
 from pathlib import Path
+import torchvision.models as tvmodels
+import torch.nn.functional as F
+from models import ResNet50
 
 
 class DiffusionWrapper(pl.LightningModule):
@@ -42,38 +45,67 @@ class DiffusionWrapper(pl.LightningModule):
             model_kwargs={'y': labels}
         )
 
-        loss = loss['loss'].mean()
         return loss
 
-    def training_step_end(self, outputs):
-        loss = torch.mean(outputs)
+    def training_step_end(self, loss):
+        for k in loss.keys():
+            loss[k] = loss[k].mean()
         return loss
 
     def training_epoch_end(self, outputs):
         loss = np.mean([l['loss'].cpu().item() for l in outputs])
+
+        AdvDis = ResNet50()
+        AdvDis.to(self.device)
+        path = '/srv/fast1/n.lokshin/checkpoints/100k_clean_90_64x64.pth'
+        AdvDis.load_state_dict(torch.load(path, map_location=self.device))
+        AdvDis.eval()
+
+        def cond_fn(x, t, y):
+            with torch.enable_grad():
+                x_in = x.detach().requires_grad_(True)
+                AdvDis.zero_grad()
+                logits = AdvDis(x_in)
+                log_probs = F.log_softmax(logits, dim=-1)
+                selected = log_probs[range(len(logits)), y.view(-1)]
+                return torch.autograd.grad(selected.sum(), x_in)[0]
+
         sampled = self.diffusion.p_sample_loop(
             self.model,
             (32, 3, self.image_size, self.image_size),
             model_kwargs={'y': torch.randint(0, 9, (32,), device=self.device)},
+            cond_fn=None,
             progress=True
         )
-        sampled = sampled * 0.5 + 0.5
-        grid = (np.transpose(make_grid(sampled).cpu().numpy(), (1, 2, 0)) * 255).astype(np.uint8)
-        imsave(f'test-{self.epoch}.png', grid)
+        sampled = (sampled + 1) * 127.5
+        sampled = torch.clamp(sampled, 0, 255)
+        grid = (np.transpose(make_grid(sampled).cpu().numpy(), (1, 2, 0))).astype(np.uint8)
+        imsave(f'test-{self.epoch}_regular.png', grid)
 
-        if self.local_rank == 0:
-            wandb.log({'loss': loss})
-            wandb.log({'generated_images': wandb.Image(grid)}, step=self.epoch)
+        sampled = self.diffusion.p_sample_loop(
+            self.model,
+            (32, 3, self.image_size, self.image_size),
+            model_kwargs={'y': torch.randint(0, 9, (32,), device=self.device)},
+            cond_fn=cond_fn,
+            progress=True
+        )
+        sampled = (sampled + 1) * 127.5
+        sampled = torch.clamp(sampled, 0, 255)
+        grid = (np.transpose(make_grid(sampled).cpu().numpy(), (1, 2, 0))).astype(np.uint8)
+        imsave(f'test-{self.epoch}_guided.png', grid)
 
-            if self.min_loss < loss:
-                print(f'Loss decreased from {self.min_loss:.3f} to {loss:.3f}')
-                to_save = {
-                    'config': self.config,
-                    'state_dict': self.model.state_dict()
-                }
-                torch.save(to_save, str(self.ckpt_folder / f'ckpt_epoch{self.epoch}.pth'))
-                self.min_loss = loss
-            self.epoch += 1
+        wandb.log({'loss': loss})
+        wandb.log({'generated_images': wandb.Image(grid)}, step=self.epoch)
+
+        if self.min_loss > loss:
+            print(f'Loss decreased from {self.min_loss:.3f} to {loss:.3f}')
+            to_save = {
+                'config': self.config,
+                'state_dict': self.model.state_dict()
+            }
+            torch.save(to_save, str(self.ckpt_folder / f'ckpt_epoch{self.epoch}.pth'))
+            self.min_loss = loss
+        self.epoch += 1
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=float(self.config['RUN']['lr']))
