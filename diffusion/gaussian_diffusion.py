@@ -125,6 +125,9 @@ class GaussianDiffusion:
         model_var_type,
         loss_type,
         rescale_timesteps=False,
+        p2=False,
+        p2_gamma=0,
+        p2_k=1
     ):
         self.model_mean_type = model_mean_type
         self.model_var_type = model_var_type
@@ -169,6 +172,12 @@ class GaussianDiffusion:
             * np.sqrt(alphas)
             / (1.0 - self.alphas_cumprod)
         )
+
+        # P2 weighting
+        self.p2 = p2
+        self.p2_gamma = float(p2_gamma)
+        self.p2_k = float(p2_k)
+        self.snr = 1.0 / (1 - self.alphas_cumprod) - 1
 
     def q_mean_variance(self, x_start, t):
         """
@@ -808,7 +817,11 @@ class GaussianDiffusion:
                 ModelMeanType.EPSILON: noise,
             }[self.model_mean_type]
             assert model_output.shape == target.shape == x_start.shape
-            terms["mse"] = mean_flat((target - model_output) ** 2)
+
+            # P2 weighting
+            weight = _extract_into_tensor(1 / (self.p2_k + self.snr)**self.p2_gamma, t, target.shape) if self.p2 else 1.0
+            terms["mse"] = mean_flat(weight * (target - model_output) ** 2)
+
             if "vb" in terms:
                 terms["loss"] = terms["mse"] + terms["vb"]
             else:

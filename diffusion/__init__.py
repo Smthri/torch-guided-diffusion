@@ -1,6 +1,3 @@
-import torch
-import torch.nn.functional as F
-from tqdm import tqdm
 from .schedules import (
     cosine_beta_schedule,
     linear_beta_schedule,
@@ -32,16 +29,35 @@ loss_type_dict = {
 }
 
 
+def get_betas(
+    schedule_type,
+    num_timesteps,
+    s=0.008
+):
+    if schedule_type == 'cosine':
+        return cosine_beta_schedule(num_timesteps, s)
+    elif schedule_type == 'linear':
+        return linear_beta_schedule(num_timesteps)
+    elif schedule_type == 'quadratic':
+        return quadratic_beta_schedule(num_timesteps)
+    elif schedule_type == 'sigmoid':
+        return sigmoid_beta_schedule(num_timesteps)
+    else:
+        raise NotImplementedError('Unknown beta schedule')
+
+
 def create_diffusion(
     betas, model_mean_type,
-    model_var_type, loss_type, rescale_timesteps
+    model_var_type, loss_type, rescale_timesteps,
+    p2, p2_gamma, p2_k, **kwargs
 ):
     return GaussianDiffusion(
         betas,
         mean_type_dict[model_mean_type],
         var_type_dict[model_var_type],
         loss_type_dict[loss_type],
-        rescale_timesteps
+        rescale_timesteps,
+        p2, p2_gamma, p2_k
     )
 
 

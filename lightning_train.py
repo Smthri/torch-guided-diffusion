@@ -5,10 +5,8 @@ from args import get_args
 import yaml
 from dataset import ConcatDatasets
 import diffusion
-from torchinfo import summary
 from wrapper import DiffusionWrapper
 import pytorch_lightning as pl
-from pytorch_lightning.strategies import DDPStrategy, DDPSpawnStrategy
 
 
 def get_train_transforms(imsize):
@@ -46,23 +44,14 @@ if __name__ == '__main__':
     config['MODEL']['num_classes'] = len(dataset.classes)
     print('Creating model...')
     unet = models.create_unet(**config['MODEL'])
-    '''with open('summary.txt', 'w') as f:
-        f.write(str(summary(unet, input_data=[
-            torch.randn(1, 3, IMAGE_SIZE, IMAGE_SIZE),
-            torch.randint(0, 1, (1,)),
-            torch.randint(0, 9, (1,))
-        ])))'''
     print('Done.')
 
     # Create diffusion processor
     timesteps = config['DIFFUSION']['diffusion_steps']
-    betas = diffusion.cosine_beta_schedule(timesteps)
+    betas = diffusion.get_betas(config['DIFFUSION']['beta_schedule'], timesteps)
     gaussian_diffusion = diffusion.create_diffusion(
         betas,
-        config['DIFFUSION']['model_mean_type'],
-        config['DIFFUSION']['model_var_type'],
-        config['DIFFUSION']['loss'],
-        config['DIFFUSION']['rescale_timesteps']
+        **config['DIFFUSION']
     )
 
     trainer = pl.Trainer(
@@ -79,7 +68,8 @@ if __name__ == '__main__':
         diffusion=gaussian_diffusion,
         image_size=IMAGE_SIZE,
         config=config,
-        ckpt_folder=config['RUN']['ckpt_dir']
+        ckpt_folder=config['RUN']['ckpt_dir'],
+        log_folder=config['RUN']['log_folder']
     )
     trainer.fit(process, train_dataloaders=train_loader)
 

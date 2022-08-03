@@ -4,16 +4,20 @@ RUN:
     eval_every: 2
     lr: 1e-4
     ckpt_dir: "/srv/fast1/n.lokshin/checkpoints/diffusion"
+    log_dir: "tmp"
 DIFFUSION:
     diffusion_steps: 200
-    noise_schedule: cosine
+    beta_schedule: linear
     predict_xstart: false
     rescale_learned_sigmas: false
     rescale_timesteps: false
     timestep_respacing: ''
-    loss: mse
+    loss_type: mse
     model_mean_type: x_prev
     model_var_type: fixed_small
+    p2: false
+    p2_gamma: 0.5
+    p2_k: 1
 MODEL:
     attention_resolutions: 16,8
     channel_mult: ''
