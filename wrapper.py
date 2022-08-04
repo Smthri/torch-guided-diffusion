@@ -27,6 +27,7 @@ class DiffusionWrapper(pl.LightningModule):
         with open(str(self.ckpt_folder / self.experiment_folder / 'config.yml'), 'w') as outfile:
             yaml.dump(self.config, outfile, default_flow_style=False)
         self.log_folder = Path(log_folder)
+        self.log_folder.mkdir(parents=True, exist_ok=True)
         wandb.init(project='PyTorch-Diffusion', config=config)
 
     def forward(self, x):
@@ -116,12 +117,16 @@ class DiffusionWrapper(pl.LightningModule):
             to_save = {
                 'state_dict': self.model.state_dict()
             }
-            torch.save(to_save, str(self.ckpt_folder / f'best_epoch{self.epoch}.pth'))
+            torch.save(to_save, str(self.ckpt_folder / f'best.pth'))
             self.min_loss = loss
         self.epoch += 1
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=float(self.config['RUN']['lr']))
+        optimizer = torch.optim.Adam(
+            self.model.parameters(),
+            lr=float(self.config['RUN']['lr']),
+            weight_decay=float(self.config['RUN']['weight_decay'])
+        )
         scheduler = ReduceLROnPlateau(
             optimizer=optimizer,
             mode='min',
