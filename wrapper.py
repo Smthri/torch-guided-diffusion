@@ -62,8 +62,7 @@ class DiffusionWrapper(pl.LightningModule):
         losses = {}
         for k in outputs[0].keys():
             losses[k] = np.mean([l[k].cpu().item() for l in outputs])
-        self.log('loss', losses['loss'])
-        self.log('mse', losses['mse'])
+            self.log(k, losses[k])
         loss = losses['loss']
 
         AdvDis = ResNet50()

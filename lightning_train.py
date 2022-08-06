@@ -11,6 +11,8 @@ import pytorch_lightning as pl
 
 def get_train_transforms(imsize):
     return transforms.Compose([
+        transforms.RandomCrop(200),
+        transforms.RandomHorizontalFlip(),
         transforms.Resize(imsize),
         transforms.ToTensor(),
         transforms.Normalize(mean=.5, std=.5)
