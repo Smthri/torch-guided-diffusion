@@ -131,7 +131,8 @@ class DiffusionWrapper(pl.LightningModule):
         }
         torch.save(to_save, str(self.ckpt_folder / self.experiment_folder / f'best_epoch{self.epoch}.pth'))
         if self.min_loss > loss:
-            print(f'Loss decreased from {self.min_loss:.3f} to {loss:.3f}')
+            print(f'Loss decreased from {self.min_loss:.6f} to {loss:.6f}. Saving checkpoint with config.')
+            to_save['config'] = self.config
             torch.save(to_save, str(self.ckpt_folder / f'best.pth'))
             self.min_loss = loss
         self.epoch += 1
@@ -144,8 +145,8 @@ class DiffusionWrapper(pl.LightningModule):
         )
         scheduler = lr_scheduler.StepLR(
             optimizer=optimizer,
-            step_size=10,
-            gamma=0.1,
+            step_size=self.config['RUN']['lr_decay_step_size'],
+            gamma=self.config['RUN']['lr_gamma'],
             verbose=True
         )
         return [optimizer], {
