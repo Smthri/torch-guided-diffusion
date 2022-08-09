@@ -7,13 +7,23 @@ from torchvision.utils import make_grid
 from pathlib import Path
 import torch.nn.functional as F
 from models import ResNet50
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim import lr_scheduler
 from datetime import datetime
 import yaml
+from diffusion import LossAwareSampler
 
 
 class DiffusionWrapper(pl.LightningModule):
-    def __init__(self, model, diffusion, image_size, config, ckpt_folder='checkpoints', log_folder='tmp'):
+    def __init__(
+        self,
+        model,
+        diffusion,
+        image_size,
+        config,
+        sampler,
+        ckpt_folder='checkpoints',
+        log_folder='tmp'
+    ):
         super().__init__()
         self.image_size = image_size
         self.model = model
@@ -28,6 +38,7 @@ class DiffusionWrapper(pl.LightningModule):
             yaml.dump(self.config, outfile, default_flow_style=False)
         self.log_folder = Path(log_folder)
         self.log_folder.mkdir(parents=True, exist_ok=True)
+        self.sampler = sampler
         wandb.init(project='PyTorch-Diffusion', config=config)
 
     def forward(self, x):
@@ -43,13 +54,21 @@ class DiffusionWrapper(pl.LightningModule):
         imgs, labels = batch
         batch_size = imgs.shape[0]
 
-        # Algorithm 1 line 3: sample t uniformally for every example in the batch
-        t = torch.randint(0, self.diffusion.num_timesteps, (batch_size,), device=self.device).long()
+        # Sample according to sampler
+        t, weights = self.sampler.sample(batch_size, self.device)
+        #t = torch.randint(0, self.diffusion.num_timesteps, (batch_size,), device=self.device).long()
 
         loss = self.diffusion.training_losses(
             self.model, imgs, t,
             model_kwargs={'y': labels}
         )
+
+        if isinstance(self.sampler, LossAwareSampler):
+            self.sampler.update_with_local_losses(
+                t, loss["loss"].detach()
+            )
+
+        loss["loss"] = (loss["loss"] * weights)
 
         return loss
 
@@ -67,7 +86,7 @@ class DiffusionWrapper(pl.LightningModule):
 
         AdvDis = ResNet50()
         AdvDis.to(self.device)
-        path = '/srv/fast1/n.lokshin/checkpoints/100k_clean_90_64x64.pth'
+        path = '/srv/fast1/n.lokshin/checkpoints/100k_clean_90_128x128.pth'
         AdvDis.load_state_dict(torch.load(path, map_location=self.device))
         AdvDis.eval()
 
@@ -105,7 +124,7 @@ class DiffusionWrapper(pl.LightningModule):
         imsave(str(self.log_folder / f'test-{self.epoch}_guided.png'), grid)
 
         wandb.log(losses)
-        wandb.log({'generated_images': wandb.Image(grid, caption='guided')}, step=self.epoch)
+        wandb.log({'generated_images': [wandb.Image(grid, caption='guided')]}, step=self.epoch)
 
         to_save = {
             'state_dict': self.model.state_dict()
@@ -113,9 +132,6 @@ class DiffusionWrapper(pl.LightningModule):
         torch.save(to_save, str(self.ckpt_folder / self.experiment_folder / f'best_epoch{self.epoch}.pth'))
         if self.min_loss > loss:
             print(f'Loss decreased from {self.min_loss:.3f} to {loss:.3f}')
-            to_save = {
-                'state_dict': self.model.state_dict()
-            }
             torch.save(to_save, str(self.ckpt_folder / f'best.pth'))
             self.min_loss = loss
         self.epoch += 1
@@ -126,10 +142,11 @@ class DiffusionWrapper(pl.LightningModule):
             lr=float(self.config['RUN']['lr']),
             weight_decay=float(self.config['RUN']['weight_decay'])
         )
-        scheduler = ReduceLROnPlateau(
+        scheduler = lr_scheduler.StepLR(
             optimizer=optimizer,
-            mode='min',
-            factor=0.5
+            step_size=10,
+            gamma=0.1,
+            verbose=True
         )
         return [optimizer], {
             "scheduler": scheduler,

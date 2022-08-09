@@ -1,3 +1,8 @@
+from .resample import (
+    UniformSampler,
+    LossSecondMomentResampler,
+    LossAwareSampler
+)
 from .schedules import (
     cosine_beta_schedule,
     linear_beta_schedule,
@@ -19,7 +24,7 @@ var_type_dict = {
     'learned': ModelVarType.LEARNED,
     'fixed_small': ModelVarType.FIXED_SMALL,
     'fixed_large': ModelVarType.FIXED_LARGE,
-    'range': ModelVarType.LEARNED_RANGE
+    'learned_range': ModelVarType.LEARNED_RANGE
 }
 loss_type_dict = {
     'mse': LossType.MSE,
@@ -27,6 +32,21 @@ loss_type_dict = {
     'kl': LossType.KL,
     'rescaled_kl': LossType.RESCALED_KL
 }
+
+
+def create_named_schedule_sampler(name, diffusion):
+    """
+    Create a ScheduleSampler from a library of pre-defined samplers.
+
+    :param name: the name of the sampler.
+    :param diffusion: the diffusion object to sample for.
+    """
+    if name == "uniform":
+        return UniformSampler(diffusion)
+    elif name == "loss-second-moment":
+        return LossSecondMomentResampler(diffusion)
+    else:
+        raise NotImplementedError(f"unknown schedule sampler: {name}")
 
 
 def get_betas(

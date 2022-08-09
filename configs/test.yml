@@ -2,20 +2,21 @@ RUN:
     batch_size: 16
     epochs: 100
     eval_every: 2
-    lr: 1e-4
+    lr: 1e-5
     ckpt_dir: "/srv/fast1/n.lokshin/checkpoints/diffusion"
     log_folder: "tmp"
     weight_decay: 0.0
 DIFFUSION:
-    diffusion_steps: 250
-    beta_schedule: linear
+    diffusion_steps: 500
+    beta_schedule: cosine
     predict_xstart: false
     rescale_learned_sigmas: false
     rescale_timesteps: false
     timestep_respacing: ''
-    loss_type: kl
+    loss_type: mse
     model_mean_type: x_prev
     model_var_type: fixed_small
+    schedule_sampler: loss-second-moment
     p2: false
     p2_gamma: 1
     p2_k: 1
@@ -36,3 +37,4 @@ MODEL:
     use_fp16: false
     use_new_attention_order: true
     use_scale_shift_norm: true
+    convnext: false

@@ -20,6 +20,7 @@ def create_unet(
     resblock_updown=False,
     use_fp16=False,
     use_new_attention_order=False,
+    convnext=True,
     num_classes=1000
 ):
     if channel_mult == "":
@@ -58,4 +59,5 @@ def create_unet(
         use_scale_shift_norm=use_scale_shift_norm,
         resblock_updown=resblock_updown,
         use_new_attention_order=use_new_attention_order,
+        convnext=convnext
     )

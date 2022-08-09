@@ -56,6 +56,9 @@ if __name__ == '__main__':
         **config['DIFFUSION']
     )
 
+    # Create timestep sampler
+    sampler = diffusion.create_named_schedule_sampler(config['DIFFUSION']['schedule_sampler'], gaussian_diffusion)
+
     trainer = pl.Trainer(
         max_epochs=config['RUN']['epochs'],
         gpus=-1,
@@ -70,6 +73,7 @@ if __name__ == '__main__':
         diffusion=gaussian_diffusion,
         image_size=IMAGE_SIZE,
         config=config,
+        sampler=sampler,
         ckpt_folder=config['RUN']['ckpt_dir'],
         log_folder=config['RUN']['log_folder']
     )
