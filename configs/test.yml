@@ -2,12 +2,12 @@ RUN:
     batch_size: 16
     epochs: 100
     eval_every: 2
-    lr: 1e-5
+    lr: 1e-4
     ckpt_dir: "/srv/fast1/n.lokshin/checkpoints/diffusion"
     log_folder: "tmp"
     weight_decay: 0.0
 DIFFUSION:
-    diffusion_steps: 500
+    diffusion_steps: 200
     beta_schedule: cosine
     predict_xstart: false
     rescale_learned_sigmas: false

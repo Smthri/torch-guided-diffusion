@@ -109,7 +109,7 @@ class DiffusionWrapper(pl.LightningModule):
         sampled = (sampled + 1) * 127.5
         sampled = torch.clamp(sampled, 0, 255)
         grid = (np.transpose(make_grid(sampled).cpu().numpy(), (1, 2, 0))).astype(np.uint8)
-        imsave(str(self.log_folder / f'test-{self.epoch}_regular.png'), grid)
+        imsave(str(self.log_folder / f'test-{self.epoch:04d}_regular.png'), grid)
 
         sampled = self.diffusion.p_sample_loop(
             self.model,
@@ -121,7 +121,7 @@ class DiffusionWrapper(pl.LightningModule):
         sampled = (sampled + 1) * 127.5
         sampled = torch.clamp(sampled, 0, 255)
         grid = (np.transpose(make_grid(sampled).cpu().numpy(), (1, 2, 0))).astype(np.uint8)
-        imsave(str(self.log_folder / f'test-{self.epoch}_guided.png'), grid)
+        imsave(str(self.log_folder / f'test-{self.epoch:04d}_guided.png'), grid)
 
         wandb.log(losses)
         wandb.log({'generated_images': [wandb.Image(grid, caption='guided')]}, step=self.epoch)
