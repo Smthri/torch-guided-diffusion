@@ -39,6 +39,12 @@ class DiffusionWrapper(pl.LightningModule):
         self.log_folder = Path(log_folder)
         self.log_folder.mkdir(parents=True, exist_ok=True)
         self.sampler = sampler
+        self.guiding_cls = ResNet50()
+        self.guiding_cls.to(self.device)
+        self.guiding_cls.load_state_dict(
+            torch.load(self.config['DIFFUSION']['guiding_classifier'], map_location='cpu')
+        )
+        self.guiding_cls.eval()
         wandb.init(project='PyTorch-Diffusion', config=config)
 
     def forward(self, x):
@@ -84,17 +90,11 @@ class DiffusionWrapper(pl.LightningModule):
             self.log(k, losses[k])
         loss = losses['loss']
 
-        AdvDis = ResNet50()
-        AdvDis.to(self.device)
-        path = '/srv/fast1/n.lokshin/checkpoints/100k_clean_90_128x128.pth'
-        AdvDis.load_state_dict(torch.load(path, map_location=self.device))
-        AdvDis.eval()
-
         def cond_fn(x, t, y):
             with torch.enable_grad():
                 x_in = x.detach().requires_grad_(True)
-                AdvDis.zero_grad()
-                logits = AdvDis(x_in)
+                self.guiding_cls.zero_grad()
+                logits = self.guiding_cls(x_in)
                 log_probs = F.log_softmax(logits, dim=-1)
                 selected = log_probs[range(len(logits)), y.view(-1)]
                 return torch.autograd.grad(selected.sum(), x_in)[0]
@@ -126,14 +126,8 @@ class DiffusionWrapper(pl.LightningModule):
         wandb.log(losses)
         wandb.log({'generated_images': [wandb.Image(grid, caption='guided')]}, step=self.epoch)
 
-        to_save = {
-            'state_dict': self.model.state_dict()
-        }
-        torch.save(to_save, str(self.ckpt_folder / self.experiment_folder / f'best_epoch{self.epoch}.pth'))
         if self.min_loss > loss:
-            print(f'Loss decreased from {self.min_loss:.6f} to {loss:.6f}. Saving checkpoint with config.')
-            to_save['config'] = self.config
-            torch.save(to_save, str(self.ckpt_folder / f'best.pth'))
+            print(f'Loss decreased from {self.min_loss} to {loss}.')
             self.min_loss = loss
         self.epoch += 1
 
@@ -143,11 +137,10 @@ class DiffusionWrapper(pl.LightningModule):
             lr=float(self.config['RUN']['lr']),
             weight_decay=float(self.config['RUN']['weight_decay'])
         )
-        scheduler = lr_scheduler.StepLR(
-            optimizer=optimizer,
-            step_size=self.config['RUN']['lr_decay_step_size'],
-            gamma=self.config['RUN']['lr_gamma'],
-            verbose=True
+        scheduler = lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='min',
+            factor=float(self.config['RUN']['lr_gamma']),
+            patience=int(self.config['RUN']['lr_decay_step_size'])
         )
         return [optimizer], {
             "scheduler": scheduler,

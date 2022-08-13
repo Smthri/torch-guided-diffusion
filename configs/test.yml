@@ -1,15 +1,16 @@
 RUN:
-    batch_size: 16
-    epochs: 100
+    batch_size: 32
+    epochs: 10000
     eval_every: 2
-    lr: 1e-4
+    lr: 1e-5
     ckpt_dir: "/srv/fast1/n.lokshin/checkpoints/diffusion"
     log_folder: "tmp"
     weight_decay: 0.0
     lr_decay_step_size: 10
     lr_gamma: 0.1
 DIFFUSION:
-    diffusion_steps: 200
+    guiding_classifier: "/srv/fast1/n.lokshin/checkpoints/100k_clean_90_64x64.pth"
+    diffusion_steps: 500
     beta_schedule: cosine
     predict_xstart: false
     rescale_learned_sigmas: false
@@ -26,8 +27,9 @@ MODEL:
     attention_resolutions: 16,8
     channel_mult: ''
     class_cond: true
+    num_classes: 9
     dropout: 0.0
-    image_size: 128
+    image_size: 64
     learn_sigma: false
     num_channels: 96
     num_head_channels: -1
