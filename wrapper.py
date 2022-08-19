@@ -22,7 +22,8 @@ class DiffusionWrapper(pl.LightningModule):
         config,
         sampler,
         ckpt_folder='checkpoints',
-        log_folder='tmp'
+        log_folder='tmp',
+        log=True
     ):
         super().__init__()
         self.image_size = image_size
@@ -45,7 +46,10 @@ class DiffusionWrapper(pl.LightningModule):
             torch.load(self.config['DIFFUSION']['guiding_classifier'], map_location='cpu')
         )
         self.guiding_cls.eval()
-        wandb.init(project='PyTorch-Diffusion', config=config)
+        self.save_hyperparameters()
+        self.log = log
+        if self.log:
+            wandb.init(project='PyTorch-Diffusion', config=config)
 
     def forward(self, x):
         sampled = self.diffusion.p_sample_loop(

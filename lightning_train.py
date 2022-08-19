@@ -76,7 +76,7 @@ if __name__ == '__main__':
         persistent_workers=True,
         pin_memory=True,
     )
-    config['RUN']['classes'] = dataset.classes
+    process.config['RUN']['classes'] = dataset.classes
 
     trainer = pl.Trainer(
         default_root_dir=config['RUN']['ckpt_dir'],
