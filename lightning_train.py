@@ -8,6 +8,8 @@ import diffusion
 from wrapper import DiffusionWrapper
 import pytorch_lightning as pl
 import sys
+from datetime import datetime
+from pathlib import Path
 
 
 def get_train_transforms(imsize):
@@ -26,38 +28,37 @@ if __name__ == '__main__':
     if args.config is not None and args.continue_ckpt is None:
         with open(args.config, 'r') as f:
             config = yaml.safe_load(f)
-
-        # Create a backbone model
-        print('Creating model...')
-        unet = models.create_unet(**config['MODEL'])
-        print('Done.')
-
-        # Create diffusion processor
-        timesteps = config['DIFFUSION']['diffusion_steps']
-        betas = diffusion.get_betas(config['DIFFUSION']['beta_schedule'], timesteps)
-        gaussian_diffusion = diffusion.create_diffusion(
-            betas,
-            **config['DIFFUSION']
-        )
-
-        # Create timestep sampler
-        sampler = diffusion.create_named_schedule_sampler(config['DIFFUSION']['schedule_sampler'], gaussian_diffusion)
-
-        process = DiffusionWrapper(
-            model=unet,
-            diffusion=gaussian_diffusion,
-            image_size=config['MODEL']['image_size'],
-            config=config,
-            sampler=sampler,
-            ckpt_folder=config['RUN']['ckpt_dir'],
-            log_folder=config['RUN']['log_folder']
-        )
     elif args.config is None and args.continue_ckpt is not None:
-        process = DiffusionWrapper.load_from_checkpoint(args.continue_ckpt)
-        config = process.config
+        ckpt = torch.load(args.continue_ckpt, map_location='cpu')
+        config = ckpt['config']
     else:
         print('Invalid combination of arguments \"continue_ckpt\" and \"config\", must pass only one.')
         sys.exit(0)
+
+    # Create a backbone model
+    print('Creating model...')
+    unet = models.create_unet(**config['MODEL'])
+    print('Done.')
+
+    # Create diffusion processor
+    timesteps = config['DIFFUSION']['diffusion_steps']
+    betas = diffusion.get_betas(config['DIFFUSION']['beta_schedule'], timesteps)
+    gaussian_diffusion = diffusion.create_diffusion(
+        betas,
+        **config['DIFFUSION']
+    )
+
+    # Create timestep sampler
+    sampler = diffusion.create_named_schedule_sampler(config['DIFFUSION']['schedule_sampler'], gaussian_diffusion)
+
+    process = DiffusionWrapper(
+        model=unet,
+        diffusion=gaussian_diffusion,
+        image_size=config['MODEL']['image_size'],
+        config=config,
+        sampler=sampler,
+        log_folder=config['RUN']['log_folder']
+    )
 
     IMAGE_SIZE = config['MODEL']['image_size']
 
@@ -78,16 +79,23 @@ if __name__ == '__main__':
     )
     process.config['RUN']['classes'] = dataset.classes
 
+    ckpt_folder = Path(config['RUN']['ckpt_dir'])
+    experiment_folder = Path(datetime.now().strftime('%d_%m_%Y__%H_%M_%S'))
+    (ckpt_folder / experiment_folder).mkdir(parents=True, exist_ok=True)
     trainer = pl.Trainer(
-        default_root_dir=config['RUN']['ckpt_dir'],
+        default_root_dir=str(ckpt_folder / experiment_folder),
         enable_checkpointing=True,
         max_epochs=config['RUN']['epochs'],
-        gpus=-1,
         replace_sampler_ddp=False,
-        accelerator='auto',
+        accelerator='gpu',
+        devices=-1,
         amp_level='O3',
         amp_backend='apex',
         strategy='dp'
     )
-    trainer.fit(process, train_dataloaders=train_loader)
+    trainer.fit(
+        process,
+        train_dataloaders=train_loader,
+        ckpt_path=args.continue_ckpt if args.continue_ckpt is not None else None
+    )
 

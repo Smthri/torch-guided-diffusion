@@ -1,8 +1,8 @@
 RUN:
-    batch_size: 32
+    batch_size: 128
     epochs: 10000
     eval_every: 2
-    lr: 1e-5
+    lr: 1e-6
     ckpt_dir: "/srv/fast1/n.lokshin/checkpoints/diffusion"
     log_folder: "tmp"
     weight_decay: 0.0
@@ -10,7 +10,7 @@ RUN:
     lr_gamma: 0.1
 DIFFUSION:
     guiding_classifier: "/srv/fast1/n.lokshin/checkpoints/100k_clean_90_64x64.pth"
-    diffusion_steps: 500
+    diffusion_steps: 1000
     beta_schedule: cosine
     predict_xstart: false
     rescale_learned_sigmas: false

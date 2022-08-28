@@ -21,7 +21,6 @@ class DiffusionWrapper(pl.LightningModule):
         image_size,
         config,
         sampler,
-        ckpt_folder='checkpoints',
         log_folder='tmp',
         log=True
     ):
@@ -32,11 +31,6 @@ class DiffusionWrapper(pl.LightningModule):
         self.config = config
         self.epoch = 0
         self.min_loss = np.inf
-        self.ckpt_folder = Path(ckpt_folder)
-        self.experiment_folder = Path(datetime.now().strftime('%d_%m_%Y__%H_%M_%S'))
-        (self.ckpt_folder / self.experiment_folder).mkdir(parents=True, exist_ok=True)
-        with open(str(self.ckpt_folder / self.experiment_folder / 'config.yml'), 'w') as outfile:
-            yaml.dump(self.config, outfile, default_flow_style=False)
         self.log_folder = Path(log_folder)
         self.log_folder.mkdir(parents=True, exist_ok=True)
         self.sampler = sampler
@@ -46,9 +40,9 @@ class DiffusionWrapper(pl.LightningModule):
             torch.load(self.config['DIFFUSION']['guiding_classifier'], map_location='cpu')
         )
         self.guiding_cls.eval()
-        self.save_hyperparameters()
-        self.log = log
-        if self.log:
+        #self.save_hyperparameters()
+        self.wandb_log = log
+        if self.wandb_log:
             wandb.init(project='PyTorch-Diffusion', config=config)
 
     def forward(self, x):
@@ -91,7 +85,7 @@ class DiffusionWrapper(pl.LightningModule):
         losses = {}
         for k in outputs[0].keys():
             losses[k] = np.mean([l[k].cpu().item() for l in outputs])
-            self.log(k, losses[k])
+        self.log_dict(losses)
         loss = losses['loss']
 
         def cond_fn(x, t, y):
@@ -101,7 +95,7 @@ class DiffusionWrapper(pl.LightningModule):
                 logits = self.guiding_cls(x_in)
                 log_probs = F.log_softmax(logits, dim=-1)
                 selected = log_probs[range(len(logits)), y.view(-1)]
-                return torch.autograd.grad(selected.sum(), x_in)[0]
+                return 5 * torch.autograd.grad(selected.sum(), x_in)[0]
 
         sampled = self.diffusion.p_sample_loop(
             self.model,
@@ -134,6 +128,9 @@ class DiffusionWrapper(pl.LightningModule):
             print(f'Loss decreased from {self.min_loss} to {loss}.')
             self.min_loss = loss
         self.epoch += 1
+
+    def on_save_checkpoint(self, checkpoint):
+        checkpoint["config"] = self.config
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
