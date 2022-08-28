@@ -29,7 +29,6 @@ class DiffusionWrapper(pl.LightningModule):
         self.model = model
         self.diffusion = diffusion
         self.config = config
-        self.epoch = 0
         self.min_loss = np.inf
         self.log_folder = Path(log_folder)
         self.log_folder.mkdir(parents=True, exist_ok=True)
@@ -107,7 +106,7 @@ class DiffusionWrapper(pl.LightningModule):
         sampled = (sampled + 1) * 127.5
         sampled = torch.clamp(sampled, 0, 255)
         grid = (np.transpose(make_grid(sampled).cpu().numpy(), (1, 2, 0))).astype(np.uint8)
-        imsave(str(self.log_folder / f'test-{self.epoch:04d}_regular.png'), grid)
+        imsave(str(self.log_folder / f'test-{self.current_epoch:04d}_regular.png'), grid)
 
         sampled = self.diffusion.p_sample_loop(
             self.model,
@@ -119,15 +118,15 @@ class DiffusionWrapper(pl.LightningModule):
         sampled = (sampled + 1) * 127.5
         sampled = torch.clamp(sampled, 0, 255)
         grid = (np.transpose(make_grid(sampled).cpu().numpy(), (1, 2, 0))).astype(np.uint8)
-        imsave(str(self.log_folder / f'test-{self.epoch:04d}_guided.png'), grid)
+        imsave(str(self.log_folder / f'test-{self.current_epoch:04d}_guided.png'), grid)
 
         wandb.log(losses)
-        wandb.log({'generated_images': [wandb.Image(grid, caption='guided')]}, step=self.epoch)
+        wandb.log({'generated_images': [wandb.Image(grid, caption='guided')]}, step=self.current_epoch)
 
         if self.min_loss > loss:
             print(f'Loss decreased from {self.min_loss} to {loss}.')
             self.min_loss = loss
-        self.epoch += 1
+        self.current_epoch += 1
 
     def on_save_checkpoint(self, checkpoint):
         checkpoint["config"] = self.config
